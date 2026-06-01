@@ -369,8 +369,8 @@ export default function App() {
         {/* ── Hero ── */}
         <div className="hero">
           <div className="hero-eyebrow">Skincare Safety Scanner</div>
-          <h1 className="hero-title">Know what's <em>really</em><br />in your products</h1>
-          <p className="hero-sub">We scan your ingredients against 25 high-concern chemicals cited by toxicologists and health researchers.</p>
+          <h1 className="hero-title">Know what's <em>really</em><br />in the skincare products you use</h1>
+          <p className="hero-sub">This app searches for your product in the <a href="https://www.openbeautyfacts.org/" target="_blank" rel="noopener noreferrer">Open Beauty Facts</a> database and scans its ingredients against 25 high-concern chemicals cited by toxicologists and health researchers.</p>
         </div>
 
         {/* ── Search + Fallbacks ── */}
