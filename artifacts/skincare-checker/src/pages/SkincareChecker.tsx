@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { matchToxicIngredients, type AnalysisResult } from "../lib/ingredients";
 
 // ─── Provider Abstraction Layer ───────────────────────────────────────────────
@@ -229,6 +229,62 @@ const styles = `
 
   .app .empty-state { text-align: center; padding: 40px 20px; color: #7A7A7A; font-size: 14px; background: rgba(255,255,255,0.82); border-radius: 16px; border: 1px solid rgba(255,255,255,0.8); }
   .app .empty-state .icon { font-size: 32px; margin-bottom: 10px; }
+
+  .app .settings-bar {
+    max-width: 560px; margin: 0 auto 6px; padding: 0 20px;
+    display: flex; justify-content: flex-end;
+  }
+  .app .settings-toggle {
+    background: none; border: none; padding: 4px 8px;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; color: #BBADA5;
+    cursor: pointer; display: flex; align-items: center; gap: 5px;
+    transition: color 0.2s; border-radius: 8px;
+  }
+  .app .settings-toggle:hover { color: #D4737A; }
+  .app .settings-toggle.active { color: #5A9E6F; }
+
+  .app .settings-card {
+    max-width: 560px; margin: 0 auto 16px; padding: 0 20px;
+  }
+  .app .settings-inner {
+    background: rgba(255,255,255,0.82); border: 1px solid rgba(212,115,122,0.18);
+    border-radius: 16px; padding: 18px 20px; backdrop-filter: blur(8px);
+  }
+  .app .settings-label {
+    font-size: 11px; font-weight: 500; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #D4737A; margin-bottom: 6px;
+  }
+  .app .settings-desc {
+    font-size: 12px; color: #7A7A7A; line-height: 1.5; margin-bottom: 12px;
+  }
+  .app .settings-desc a { color: #D4737A; text-decoration: none; }
+  .app .settings-desc a:hover { text-decoration: underline; }
+  .app .settings-row { display: flex; gap: 8px; align-items: center; }
+  .app .settings-input {
+    flex: 1; border: 1px solid rgba(212,115,122,0.2); border-radius: 10px;
+    padding: 9px 13px; font-family: 'DM Sans', sans-serif; font-size: 13px;
+    color: #2C2C2C; background: rgba(255,255,255,0.7); outline: none;
+    transition: border-color 0.2s;
+  }
+  .app .settings-input:focus { border-color: rgba(212,115,122,0.5); }
+  .app .settings-save {
+    background: linear-gradient(135deg, #D4737A, #C45E65); color: white;
+    border: none; border-radius: 10px; padding: 9px 16px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: opacity 0.2s; white-space: nowrap;
+  }
+  .app .settings-save:hover { opacity: 0.9; }
+  .app .settings-clear {
+    background: none; border: 1px solid rgba(212,115,122,0.25); border-radius: 10px;
+    padding: 9px 12px; font-family: 'DM Sans', sans-serif; font-size: 12px;
+    color: #D4737A; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .app .settings-clear:hover { background: rgba(242,196,196,0.2); }
+  .app .settings-status {
+    margin-top: 10px; font-size: 12px; display: flex; align-items: center; gap: 6px;
+  }
+  .app .settings-status.ok { color: #5A9E6F; }
+  .app .settings-status.none { color: #BBADA5; }
 `;
 
 interface ProductMeta {
@@ -239,6 +295,8 @@ interface ProductMeta {
 interface AnalysisResultWithSource extends AnalysisResult {
   source: string;
 }
+
+const GOOGLE_KEY_STORAGE = "zerotox_google_api_key";
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function SkincareChecker() {
@@ -253,6 +311,32 @@ export default function SkincareChecker() {
   const [productMeta, setProductMeta] = useState<ProductMeta | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // ── Google API key (persisted in localStorage) ─────────────────────────────
+  const [googleApiKey, setGoogleApiKey] = useState<string>("");
+  const [googleApiKeyDraft, setGoogleApiKeyDraft] = useState<string>("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(GOOGLE_KEY_STORAGE) || "";
+    setGoogleApiKey(stored);
+    setGoogleApiKeyDraft(stored);
+  }, []);
+
+  const saveGoogleKey = () => {
+    const trimmed = googleApiKeyDraft.trim();
+    localStorage.setItem(GOOGLE_KEY_STORAGE, trimmed);
+    setGoogleApiKey(trimmed);
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 2000);
+  };
+
+  const clearGoogleKey = () => {
+    localStorage.removeItem(GOOGLE_KEY_STORAGE);
+    setGoogleApiKey("");
+    setGoogleApiKeyDraft("");
+  };
 
   const reset = () => {
     setResults(null); setError(null);
@@ -316,21 +400,34 @@ export default function SkincareChecker() {
       const [header, base64] = dataUrl.split(",");
       const mediaType = header.match(/data:([^;]+);/)?.[1] ?? "image/jpeg";
       try {
-        setLoadingMsg("Reading label with Claude Vision…");
-        const res = await fetch("/api/claude", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: base64, mediaType }),
-        });
-
-        const data = await res.json() as { ingredientsText?: string; error?: string };
-        if (!res.ok) throw new Error(data.error || "OCR failed");
-        if (!data.ingredientsText) throw new Error("Couldn't extract ingredients. Try a clearer photo.");
-
-        const analysis = matchToxicIngredients(data.ingredientsText);
-        const meta: ProductMeta = { productName: query || "Scanned Product", image: null };
-        setProductMeta(meta);
-        setResults({ ...analysis, source: "Claude Vision (OCR)" });
+        const useGemini = !!googleApiKey;
+        if (useGemini) {
+          setLoadingMsg("Reading label with Google Gemini Vision…");
+          const res = await fetch("/api/gemini", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageBase64: base64, mediaType, googleApiKey }),
+          });
+          const data = await res.json() as { ingredientsText?: string; error?: string };
+          if (!res.ok) throw new Error(data.error || "Gemini OCR failed");
+          if (!data.ingredientsText) throw new Error("Couldn't extract ingredients. Try a clearer photo.");
+          const analysis = matchToxicIngredients(data.ingredientsText);
+          setProductMeta({ productName: query || "Scanned Product", image: null });
+          setResults({ ...analysis, source: "Google Gemini Vision (OCR)" });
+        } else {
+          setLoadingMsg("Reading label with Claude Vision…");
+          const res = await fetch("/api/claude", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageBase64: base64, mediaType }),
+          });
+          const data = await res.json() as { ingredientsText?: string; error?: string };
+          if (!res.ok) throw new Error(data.error || "OCR failed");
+          if (!data.ingredientsText) throw new Error("Couldn't extract ingredients. Try a clearer photo.");
+          const analysis = matchToxicIngredients(data.ingredientsText);
+          setProductMeta({ productName: query || "Scanned Product", image: null });
+          setResults({ ...analysis, source: "Claude Vision (OCR)" });
+        }
       } catch (err) {
         setError("Couldn't analyze image: " + (err as Error).message);
       } finally {
@@ -365,6 +462,52 @@ export default function SkincareChecker() {
         {/* ── Search + Fallbacks ── */}
         {!results && !loading && (
           <>
+            {/* ── Google API Key Settings ── */}
+            <div className="settings-bar">
+              <button
+                className={`settings-toggle ${googleApiKey ? "active" : ""}`}
+                onClick={() => setShowSettings(s => !s)}
+              >
+                {googleApiKey ? "🔑 Google AI connected" : "⚙️ Add Google API key"}
+              </button>
+            </div>
+
+            {showSettings && (
+              <div className="settings-card">
+                <div className="settings-inner">
+                  <div className="settings-label">🔑 Google AI API Key</div>
+                  <p className="settings-desc">
+                    Provide your own{" "}
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">
+                      Google AI Studio API key
+                    </a>{" "}
+                    to use Google Gemini Vision for photo analysis. Your key is stored only in your browser and never sent to our servers — it is forwarded directly to Google when you upload a photo.
+                  </p>
+                  <div className="settings-row">
+                    <input
+                      className="settings-input"
+                      type="password"
+                      placeholder="AIza…"
+                      value={googleApiKeyDraft}
+                      onChange={e => setGoogleApiKeyDraft(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && saveGoogleKey()}
+                    />
+                    <button className="settings-save" onClick={saveGoogleKey}>
+                      {settingsSaved ? "✓ Saved" : "Save"}
+                    </button>
+                    {googleApiKey && (
+                      <button className="settings-clear" onClick={clearGoogleKey}>Remove</button>
+                    )}
+                  </div>
+                  <div className={`settings-status ${googleApiKey ? "ok" : "none"}`}>
+                    {googleApiKey
+                      ? "✓ Google Gemini Vision will be used when you upload a photo"
+                      : "No key set — photo analysis will use the server's Claude Vision"}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="search-card">
               <div className="input-group">
                 <input

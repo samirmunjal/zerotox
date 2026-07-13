@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: claude
     description: Claude Vision OCR
+  - name: gemini
+    description: Google Gemini Vision OCR (user-supplied API key)
 paths:
   /healthz:
     get:
@@ -57,6 +59,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /gemini:
+    post:
+      operationId: geminiOcr
+      tags: [gemini]
+      summary: Extract ingredients using Google Gemini Vision (user-supplied API key)
+      description: Accepts a base64-encoded image and a user-provided Google API key, returns extracted ingredients text via Gemini Vision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiOcrInput"
+      responses:
+        "200":
+          description: Extracted ingredients text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiOcrResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Upstream API error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -66,6 +105,29 @@ components:
           type: string
       required:
         - status
+    GeminiOcrInput:
+      type: object
+      required:
+        - imageBase64
+        - googleApiKey
+      properties:
+        imageBase64:
+          type: string
+          description: Base64-encoded image data
+        mediaType:
+          type: string
+          description: MIME type of the image (default image/jpeg)
+        googleApiKey:
+          type: string
+          description: User-provided Google AI API key
+    GeminiOcrResult:
+      type: object
+      required:
+        - ingredientsText
+      properties:
+        ingredientsText:
+          type: string
+          description: Comma-separated ingredients extracted from the image
     ClaudeOcrInput:
       type: object
       required:
