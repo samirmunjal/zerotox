@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface ClaudeOcrInput {
+  /** Base64-encoded image data */
+  imageBase64: string;
 }

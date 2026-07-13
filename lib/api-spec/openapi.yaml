@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: claude
+    description: Claude Vision OCR
 paths:
   /healthz:
     get:
@@ -24,6 +26,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /claude:
+    post:
+      operationId: claudeOcr
+      tags: [claude]
+      summary: Extract ingredients from product label image
+      description: Accepts a base64-encoded image and returns extracted ingredients text via Claude Vision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaudeOcrInput"
+      responses:
+        "200":
+          description: Extracted ingredients text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaudeOcrResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +66,28 @@ components:
           type: string
       required:
         - status
-
+    ClaudeOcrInput:
+      type: object
+      required:
+        - imageBase64
+      properties:
+        imageBase64:
+          type: string
+          description: Base64-encoded image data
+    ClaudeOcrResult:
+      type: object
+      required:
+        - ingredientsText
+      properties:
+        ingredientsText:
+          type: string
+          description: Comma-separated ingredients extracted from the image
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        detail:
+          type: string

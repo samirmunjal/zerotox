@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Skincare Ingredient Checker"
+version = "1.0.0"
+id = "artifacts/skincare-checker"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22136
+
+[services.development]
+run = "pnpm --filter @workspace/skincare-checker run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/skincare-checker", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/skincare-checker/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22136"
+BASE_PATH = "/"
